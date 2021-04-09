@@ -63,34 +63,98 @@ totals = terms.cumsum(axis=0)
 print("Generating animation...")
 from matplotlib import animation
 
-# First set up the figure, the axis, and the plot element we want to animate
-fig = plt.figure()
-ax = plt.axes(xlim=(x.min() - 0.1*(x.max() - x.min()), x.max() + 0.1*(x.max() - x.min())), ylim=(y.min() - 0.1*(y.max() - y.min()), y.max() + 0.1*(y.max() - y.min())))
-ax.set_aspect('equal')
-ax.set_axis_off()
-line, = ax.plot([], [], lw=2)
+# # First set up the figure, the axis, and the plot element we want to animate
+# fig = plt.figure()
+# ax = plt.axes(xlim=(x.min() - 0.1*(x.max() - x.min()), x.max() + 0.1*(x.max() - x.min())), ylim=(y.min() - 0.1*(y.max() - y.min()), y.max() + 0.1*(y.max() - y.min())))
+# ax.set_aspect('equal')
+# ax.set_axis_off()
+# line, = ax.plot([], [], lw=2)
 
-# initialization function: plot the background of each frame
-def init():
-    line.set_data([], [])
-    return line,
+# # initialization function: plot the background of each frame
+# def init():
+#     line.set_data([], [])
+#     return line,
 
-# animation function.  This is called sequentially
-def animate(i):
-    global totals
-    # plt.figtext(0.1,0.4, f"N={i+1}")
-    x = totals[i].real
-    y = totals[i].imag
-    line.set_data(x, y)
-    return line,
+# # animation function.  This is called sequentially
+# def animate_whole(i):
+#     global totals
+#     x = totals[i].real
+#     y = totals[i].imag
+#     line.set_data(x, y)
+#     return line,
 
-# call the animator.  blit=True means only re-draw the parts that have changed.
-anim_whole = animation.FuncAnimation(fig, animate, init_func=init, frames=2*n_max+1, interval=100, blit=True)
+# # Animate along the drawing rather than along fourier terms.
+# def animate_line(i):
+#     global totals
+#     x = totals[-1, :i].real
+#     y = totals[-1, :i].imag
+#     line.set_data(x, y)
+#     return line,
+
+# fps = 50
+# anim_line = animation.FuncAnimation(fig, animate_line, init_func=init, frames=npts, interval=1000/fps, blit=True)
+# anim_line.save(f'test_{fps}fps.mp4', fps=fps, extra_args=['-vcodec', 'libx264'])
+# plt.show()
+
+# # call the animator.  blit=True means only re-draw the parts that have changed.
+# anim_whole = animation.FuncAnimation(fig, animate_whole, init_func=init, frames=2*n_max+1, interval=1000/fps, blit=True)
 
 # save the animation as an mp4.  This requires ffmpeg
-anim_whole.save('basic_animation_20fps.mp4', fps=20, extra_args=['-vcodec', 'libx264'])
-anim_whole.save('basic_animation_10fps.mp4', fps=10, extra_args=['-vcodec', 'libx264'])
-anim_whole.save('basic_animation_5fps.mp4', fps=5, extra_args=['-vcodec', 'libx264'])
-anim_whole.save('basic_animation_1fps.mp4', fps=1, extra_args=['-vcodec', 'libx264'])
+# # anim_whole.save(f'basic_animation_{fps}fps.mp4', fps=fps, extra_args=['-vcodec', 'libx264'])
+# plt.show()
 
+
+class AnimateFourier():
+    def __init__(self, fourier_terms, total_terms, drawing_coordinates, npts, fps=50):
+        self.terms = fourier_terms
+        self.totals = total_terms
+        self.fps = fps
+        self.npts = npts
+        self.x = drawing_coordinates.real
+        self.y = drawing_coordinates.imag
+        self.circles = {}
+
+        self.init_canvas()
+
+    def init_canvas(self):
+        self.fig = plt.figure()
+        self.ax = plt.axes(xlim=(self.x.min() - 0.1*(self.x.max() - self.x.min()), self.x.max() + 0.1*(self.x.max() - self.x.min())), 
+                           ylim=(self.y.min() - 0.1*(self.y.max() - self.y.min()), self.y.max() + 0.1*(self.y.max() - self.y.min())))
+        self.ax.set_aspect('equal')
+        self.ax.set_axis_off()
+        self.line, = self.ax.plot([], [], lw=2)
+
+
+    def init_circles(self, cx=0, cy=0, r=1, nterms=1):
+        for nterm in range(len(nterms)):
+            self.circles[nterm] = plt.circle((cx,cy), r, fill=False)
+        
+        for circle in self.circles.values():
+            self.ax.add_patch(circle)
+        
+
+    def init(self):
+        self.line.set_data([], [])
+        # self.init_circles()
+        return self.line,  #, self.circles,
+
+    def animate(self, i):
+        x = totals[0,:i].real + terms[1,:i].real
+        y = totals[0,:i].imag + terms[1,:i].imag
+        # x = totals[3,:i].real
+        #y = totals[3,:i].imag
+        self.line.set_data(x,y)
+
+        # for circle in self.circles.values():
+        #     circle.center = ()
+        return self.line,
+
+    def instantiate_animation(self):
+        return animation.FuncAnimation(self.fig, self.animate, init_func=self.init, frames=self.npts, interval=1000/self.fps, blit=True)
+
+
+af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, fps=25)
+anim = af.instantiate_animation()
+#anim.save(f'test_{af.fps}fps.mp4', fps=af.fps, extra_args=['-vcodec', 'libx264'])
+plt.draw()
 plt.show()

@@ -31,7 +31,7 @@ y = points.y.values
 f = x + 1j*y
 
 #Interpolate to more points.
-n_max = 5
+n_max = 50
 npts = 50*n_max + 1
 times = np.linspace(0, len(f), npts)
 print("Interpolating points...")
@@ -114,55 +114,78 @@ class AnimateFourier():
         self.x = drawing_coordinates.real
         self.y = drawing_coordinates.imag
         self.circles = []
+        self.arrows = []
         self.nterms = self.terms.shape[0]
 
         self.init_canvas()
         
 
     def init_canvas(self):
-        self.fig = plt.figure()
-        self.ax = plt.axes(xlim=(self.x.min() - 0.1*(self.x.max() - self.x.min()), self.x.max() + 0.1*(self.x.max() - self.x.min())), 
-                           ylim=(self.y.min() - 0.1*(self.y.max() - self.y.min()), self.y.max() + 0.1*(self.y.max() - self.y.min())))
+        self.fig = plt.figure(figsize=(8,8))
+        self.ax = plt.axes(xlim=(self.x.min() - 0.25*(self.x.max() - self.x.min()), self.x.max() + 0.25*(self.x.max() - self.x.min())), 
+                           ylim=(self.y.min() - 0.25*(self.y.max() - self.y.min()), self.y.max() + 0.25*(self.y.max() - self.y.min())))
         self.ax.set_aspect('equal')
         self.ax.set_axis_off()
         self.line, = self.ax.plot([], [], lw=2)
 
         self.init_circles()
+        self.init_arrows()
 
 
-    def init_circles(self, cx=0, cy=0, r=1):
+    def init_circles(self, cx=0, cy=0, r=1, alpha=0.5):
         for nterm in range(self.nterms):
-            self.circles.append(plt.Circle((cx,cy), r, fill=False, animated=True))
+            self.circles.append(plt.Circle((cx,cy), r, alpha=alpha, fill=False, animated=True))
 
-        
+    def init_arrows(self, cx=0, cy=0, dx=1, dy=1, alpha=0.5):
+        for nterm in range(self.nterms):
+            self.arrows.append(self.ax.plot([], [], alpha=alpha, lw=1, color='r')[0])
+
 
     def init(self):
         self.line.set_data([], [])
         for circle in self.circles:
             self.ax.add_patch(circle)
 
-        return [self.line] + self.circles
+        for arrow in self.arrows:
+            # self.ax.add_patch(arrow)
+            arrow.set_data([],[])
+
+        return [self.line] + self.circles + self.arrows
+
 
     def animate(self, i, animated_terms):
-        # x = totals[0,:i].real + terms[1,:i].real
-        # y = totals[0,:i].imag + terms[1,:i].imag
+        # Update outline
         x = totals[animated_terms-1,:i].real
         y = totals[animated_terms-1,:i].imag
         self.line.set_data(x,y)
 
+        # Update term circles
         for term in range(animated_terms):
             if term != 0:
-                self.circles[term].set_center((totals[term-1,i-1].real,totals[term-1,i-1].imag))
-                self.circles[term].set_radius(np.abs(terms[term,0]))
+                self.circles[term].set_center((self.totals[term-1,i-1].real,self.totals[term-1,i-1].imag))
+                self.circles[term].set_radius(np.abs(self.terms[term,0]))
 
-        return [self.line] + self.circles
+        # Update term arrows
+        for term in range(animated_terms):
+            if term != 0:
+                x1 = self.totals[term-1,i-1].real
+                x2 = self.totals[term-1,i-1].real + self.terms[term,i-1].real
+
+                y1 = self.totals[term-1,i-1].imag
+                y2 = self.totals[term-1,i-1].imag + self.terms[term,i-1].imag
+
+                self.arrows[term].set_data([x1, x2], [y1, y2])
+
+        return [self.line] + self.arrows + self.circles
+        # return self.arrows
 
     def instantiate_animation(self):
         return animation.FuncAnimation(self.fig, self.animate, init_func=self.init, fargs=[self.animated_terms], frames=self.npts, interval=1000/self.fps, blit=True)
 
 
-af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, animated_terms=4, fps=10)
-anim = af.instantiate_animation()
-#anim.save(f'test_{af.fps}fps.mp4', fps=af.fps, extra_args=['-vcodec', 'libx264'])
-plt.draw()
-plt.show()
+def make_animation(animated_terms=2, fps=15):
+    af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, animated_terms=animated_terms, fps=fps)
+    anim = af.instantiate_animation()
+    #anim.save(f'test_{af.fps}fps.mp4', fps=af.fps, extra_args=['-vcodec', 'libx264'])
+    plt.draw()
+    plt.show()

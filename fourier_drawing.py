@@ -105,16 +105,19 @@ from matplotlib import animation
 
 
 class AnimateFourier():
-    def __init__(self, fourier_terms, total_terms, drawing_coordinates, npts, fps=50):
+    def __init__(self, fourier_terms, total_terms, drawing_coordinates, npts, animated_terms=1, fps=50):
         self.terms = fourier_terms
         self.totals = total_terms
         self.fps = fps
         self.npts = npts
+        self.animated_terms = animated_terms
         self.x = drawing_coordinates.real
         self.y = drawing_coordinates.imag
-        self.circles = {}
+        self.circles = []
+        self.nterms = self.terms.shape[0]
 
         self.init_canvas()
+        
 
     def init_canvas(self):
         self.fig = plt.figure()
@@ -124,36 +127,41 @@ class AnimateFourier():
         self.ax.set_axis_off()
         self.line, = self.ax.plot([], [], lw=2)
 
+        self.init_circles()
 
-    def init_circles(self, cx=0, cy=0, r=1, nterms=1):
-        for nterm in range(len(nterms)):
-            self.circles[nterm] = plt.circle((cx,cy), r, fill=False)
-        
-        for circle in self.circles.values():
-            self.ax.add_patch(circle)
+
+    def init_circles(self, cx=0, cy=0, r=1):
+        for nterm in range(self.nterms):
+            self.circles.append(plt.Circle((cx,cy), r, fill=False, animated=True))
+
         
 
     def init(self):
         self.line.set_data([], [])
-        # self.init_circles()
-        return self.line,  #, self.circles,
+        for circle in self.circles:
+            self.ax.add_patch(circle)
 
-    def animate(self, i):
-        x = totals[0,:i].real + terms[1,:i].real
-        y = totals[0,:i].imag + terms[1,:i].imag
-        # x = totals[3,:i].real
-        #y = totals[3,:i].imag
+        return [self.line] + self.circles
+
+    def animate(self, i, animated_terms):
+        # x = totals[0,:i].real + terms[1,:i].real
+        # y = totals[0,:i].imag + terms[1,:i].imag
+        x = totals[animated_terms-1,:i].real
+        y = totals[animated_terms-1,:i].imag
         self.line.set_data(x,y)
 
-        # for circle in self.circles.values():
-        #     circle.center = ()
-        return self.line,
+        for term in range(animated_terms):
+            if term != 0:
+                self.circles[term].set_center((totals[term-1,i-1].real,totals[term-1,i-1].imag))
+                self.circles[term].set_radius(np.abs(terms[term,0]))
+
+        return [self.line] + self.circles
 
     def instantiate_animation(self):
-        return animation.FuncAnimation(self.fig, self.animate, init_func=self.init, frames=self.npts, interval=1000/self.fps, blit=True)
+        return animation.FuncAnimation(self.fig, self.animate, init_func=self.init, fargs=[self.animated_terms], frames=self.npts, interval=1000/self.fps, blit=True)
 
 
-af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, fps=25)
+af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, animated_terms=4, fps=10)
 anim = af.instantiate_animation()
 #anim.save(f'test_{af.fps}fps.mp4', fps=af.fps, extra_args=['-vcodec', 'libx264'])
 plt.draw()

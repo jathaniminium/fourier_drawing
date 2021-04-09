@@ -31,7 +31,7 @@ y = points.y.values
 f = x + 1j*y
 
 #Interpolate to more points.
-n_max = 50
+n_max = 4
 npts = 50*n_max + 1
 times = np.linspace(0, len(f), npts)
 print("Interpolating points...")
@@ -121,7 +121,7 @@ class AnimateFourier():
         
 
     def init_canvas(self):
-        self.fig = plt.figure(figsize=(8,8))
+        self.fig = plt.figure(figsize=(14,14), dpi=100)
         self.ax = plt.axes(xlim=(self.x.min() - 0.25*(self.x.max() - self.x.min()), self.x.max() + 0.25*(self.x.max() - self.x.min())), 
                            ylim=(self.y.min() - 0.25*(self.y.max() - self.y.min()), self.y.max() + 0.25*(self.y.max() - self.y.min())))
         self.ax.set_aspect('equal')
@@ -183,9 +183,10 @@ class AnimateFourier():
         return animation.FuncAnimation(self.fig, self.animate, init_func=self.init, fargs=[self.animated_terms], frames=self.npts, interval=1000/self.fps, blit=True)
 
 
-def make_animation(animated_terms=2, fps=15):
-    af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, animated_terms=animated_terms, fps=fps)
+def make_animation(animated_terms=2, fps=15, save=False):
+    af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, animated_terms=animated_terms+1, fps=fps)
     anim = af.instantiate_animation()
-    #anim.save(f'test_{af.fps}fps.mp4', fps=af.fps, extra_args=['-vcodec', 'libx264'])
+    if save:
+        anim.save(f'test_{af.fps}fps.mp4', fps=af.fps, extra_args=['-vcodec', 'libx264'])
     plt.draw()
     plt.show()

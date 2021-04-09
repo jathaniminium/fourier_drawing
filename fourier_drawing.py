@@ -31,8 +31,8 @@ y = points.y.values
 f = x + 1j*y
 
 #Interpolate to more points.
-n_max = 4
-npts = 50*n_max + 1
+n_max = 200
+npts = 20*n_max + 1
 times = np.linspace(0, len(f), npts)
 print("Interpolating points...")
 f_interp = np.interp(times, np.linspace(0,len(f), len(f)), f)
@@ -63,53 +63,14 @@ totals = terms.cumsum(axis=0)
 print("Generating animation...")
 from matplotlib import animation
 
-# # First set up the figure, the axis, and the plot element we want to animate
-# fig = plt.figure()
-# ax = plt.axes(xlim=(x.min() - 0.1*(x.max() - x.min()), x.max() + 0.1*(x.max() - x.min())), ylim=(y.min() - 0.1*(y.max() - y.min()), y.max() + 0.1*(y.max() - y.min())))
-# ax.set_aspect('equal')
-# ax.set_axis_off()
-# line, = ax.plot([], [], lw=2)
-
-# # initialization function: plot the background of each frame
-# def init():
-#     line.set_data([], [])
-#     return line,
-
-# # animation function.  This is called sequentially
-# def animate_whole(i):
-#     global totals
-#     x = totals[i].real
-#     y = totals[i].imag
-#     line.set_data(x, y)
-#     return line,
-
-# # Animate along the drawing rather than along fourier terms.
-# def animate_line(i):
-#     global totals
-#     x = totals[-1, :i].real
-#     y = totals[-1, :i].imag
-#     line.set_data(x, y)
-#     return line,
-
-# fps = 50
-# anim_line = animation.FuncAnimation(fig, animate_line, init_func=init, frames=npts, interval=1000/fps, blit=True)
-# anim_line.save(f'test_{fps}fps.mp4', fps=fps, extra_args=['-vcodec', 'libx264'])
-# plt.show()
-
-# # call the animator.  blit=True means only re-draw the parts that have changed.
-# anim_whole = animation.FuncAnimation(fig, animate_whole, init_func=init, frames=2*n_max+1, interval=1000/fps, blit=True)
-
-# save the animation as an mp4.  This requires ffmpeg
-# # anim_whole.save(f'basic_animation_{fps}fps.mp4', fps=fps, extra_args=['-vcodec', 'libx264'])
-# plt.show()
-
-
 class AnimateFourier():
-    def __init__(self, fourier_terms, total_terms, drawing_coordinates, npts, animated_terms=1, fps=50):
+    def __init__(self, fourier_terms, total_terms, drawing_coordinates, npts, animated_terms=1, n_loops=1, fps=50, speed_x=1):
         self.terms = fourier_terms
         self.totals = total_terms
         self.fps = fps
+        self.speed_x = speed_x
         self.npts = npts
+        self.n_loops = n_loops
         self.animated_terms = animated_terms
         self.x = drawing_coordinates.real
         self.y = drawing_coordinates.imag
@@ -121,9 +82,9 @@ class AnimateFourier():
         
 
     def init_canvas(self):
-        self.fig = plt.figure(figsize=(14,14), dpi=100)
-        self.ax = plt.axes(xlim=(self.x.min() - 0.25*(self.x.max() - self.x.min()), self.x.max() + 0.25*(self.x.max() - self.x.min())), 
-                           ylim=(self.y.min() - 0.25*(self.y.max() - self.y.min()), self.y.max() + 0.25*(self.y.max() - self.y.min())))
+        self.fig = plt.figure(figsize=(12,12), dpi=125)
+        self.ax = plt.axes(xlim=(self.x.min() - 0.35*(self.x.max() - self.x.min()), self.x.max() + 0.35*(self.x.max() - self.x.min())), 
+                           ylim=(self.y.min() - 0.35*(self.y.max() - self.y.min()), self.y.max() + 0.35*(self.y.max() - self.y.min())))   
         self.ax.set_aspect('equal')
         self.ax.set_axis_off()
         self.line, = self.ax.plot([], [], lw=2)
@@ -132,11 +93,11 @@ class AnimateFourier():
         self.init_arrows()
 
 
-    def init_circles(self, cx=0, cy=0, r=1, alpha=0.5):
+    def init_circles(self, cx=0, cy=0, r=0, alpha=0.5):
         for nterm in range(self.nterms):
             self.circles.append(plt.Circle((cx,cy), r, alpha=alpha, fill=False, animated=True))
 
-    def init_arrows(self, cx=0, cy=0, dx=1, dy=1, alpha=0.5):
+    def init_arrows(self, cx=0, cy=0, dx=0, dy=0, alpha=0.5):
         for nterm in range(self.nterms):
             self.arrows.append(self.ax.plot([], [], alpha=alpha, lw=1, color='r')[0])
 
@@ -154,25 +115,45 @@ class AnimateFourier():
 
 
     def animate(self, i, animated_terms):
+
         # Update outline
-        x = totals[animated_terms-1,:i].real
-        y = totals[animated_terms-1,:i].imag
+        if i > self.npts:
+            new_i = i % self.npts
+            x = np.concatenate((totals[animated_terms-1,:i].real, totals[animated_terms-1,:new_i].real))
+            y = np.concatenate((totals[animated_terms-1,:i].imag, totals[animated_terms-1,:new_i].imag))
+        else:
+            x = totals[animated_terms-1,:i].real
+            y = totals[animated_terms-1,:i].imag
         self.line.set_data(x,y)
+        # self.line.set_alpha(np.ones(len(x)))
 
         # Update term circles
         for term in range(animated_terms):
             if term != 0:
-                self.circles[term].set_center((self.totals[term-1,i-1].real,self.totals[term-1,i-1].imag))
-                self.circles[term].set_radius(np.abs(self.terms[term,0]))
+                if i > self.npts:
+                    new_i = i % self.npts
+                    self.circles[term].set_center((self.totals[term-1,new_i-1].real,self.totals[term-1,new_i-1].imag))
+                    self.circles[term].set_radius(np.abs(self.terms[term,0]))
+                else:
+                    self.circles[term].set_center((self.totals[term-1,i-1].real,self.totals[term-1,i-1].imag))
+                    self.circles[term].set_radius(np.abs(self.terms[term,0]))
 
         # Update term arrows
         for term in range(animated_terms):
             if term != 0:
-                x1 = self.totals[term-1,i-1].real
-                x2 = self.totals[term-1,i-1].real + self.terms[term,i-1].real
+                if i > self.npts:
+                    new_i = i % self.npts
+                    x1 = self.totals[term-1,new_i-1].real
+                    x2 = self.totals[term-1,new_i-1].real + self.terms[term,new_i-1].real
 
-                y1 = self.totals[term-1,i-1].imag
-                y2 = self.totals[term-1,i-1].imag + self.terms[term,i-1].imag
+                    y1 = self.totals[term-1,new_i-1].imag
+                    y2 = self.totals[term-1,new_i-1].imag + self.terms[term,new_i-1].imag
+                else:
+                    x1 = self.totals[term-1,i-1].real
+                    x2 = self.totals[term-1,i-1].real + self.terms[term,i-1].real
+
+                    y1 = self.totals[term-1,i-1].imag
+                    y2 = self.totals[term-1,i-1].imag + self.terms[term,i-1].imag
 
                 self.arrows[term].set_data([x1, x2], [y1, y2])
 
@@ -180,11 +161,12 @@ class AnimateFourier():
         # return self.arrows
 
     def instantiate_animation(self):
-        return animation.FuncAnimation(self.fig, self.animate, init_func=self.init, fargs=[self.animated_terms], frames=self.npts, interval=1000/self.fps, blit=True)
+        return animation.FuncAnimation(self.fig, self.animate, init_func=self.init, fargs=[self.animated_terms], 
+                                       frames=range(0,int(self.npts*self.n_loops),self.speed_x), interval=1000/self.fps, blit=True)
 
 
-def make_animation(animated_terms=2, fps=15, save=False):
-    af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, animated_terms=animated_terms+1, fps=fps)
+def make_animation(animated_terms=2, n_loops=1, fps=15, speed_x=1, save=False):
+    af = AnimateFourier(fourier_terms=terms, total_terms=totals, drawing_coordinates=f, npts=npts, animated_terms=animated_terms+1, n_loops=n_loops, fps=fps, speed_x=speed_x)
     anim = af.instantiate_animation()
     if save:
         anim.save(f'test_{af.fps}fps.mp4', fps=af.fps, extra_args=['-vcodec', 'libx264'])
